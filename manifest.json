@@ -1,0 +1,82 @@
+{
+  "id": "mongodb",
+  "name": "MongoDB",
+  "name_en": "MongoDB",
+  "version": "1.0.0",
+  "description": "Consulta de solo lectura a colecciones MongoDB: listar colecciones, leer documentos con filtro, contar documentos y estadísticas de colección",
+  "description_en": "Read-only queries against MongoDB collections: list collections, read documents with a filter, count documents and collection statistics",
+  "icon": "icon.svg",
+  "category": "database",
+  "category_en": "database",
+  "keywords": ["mongodb", "mongo", "nosql", "database", "base de datos", "colección", "collection", "solo lectura", "read-only"],
+  "library": {
+    "package": "ruvic-mongodb-connector",
+    "install": "pip install git+https://github.com/Dgirto/MongoDB.git#subdirectory=lib",
+    "import_name": "ruvic_mongodb_connector"
+  },
+  "auth_modes": [
+    {
+      "id": "user_password",
+      "label": "Usuario y contraseña",
+      "fields": [
+        {
+          "key": "host",
+          "label": "Host",
+          "type": "text",
+          "required": true,
+          "placeholder": "db.empresa.com",
+          "help_text": "Hostname o IP del servidor MongoDB"
+        },
+        {
+          "key": "port",
+          "label": "Puerto",
+          "type": "number",
+          "required": true,
+          "default": "27017"
+        },
+        {
+          "key": "database",
+          "label": "Base de datos",
+          "type": "text",
+          "required": true,
+          "placeholder": "produccion"
+        },
+        {
+          "key": "username",
+          "label": "Usuario",
+          "type": "text",
+          "required": true,
+          "help_text": "Se recomienda un usuario con rol read (solo lectura)"
+        },
+        {
+          "key": "password",
+          "label": "Contraseña",
+          "type": "password",
+          "secret": true,
+          "required": true
+        },
+        {
+          "key": "auth_source",
+          "label": "Base de datos de autenticación",
+          "type": "text",
+          "required": false,
+          "help_text": "Base de datos donde se validan las credenciales (authSource). Si el usuario se creó en la misma base de datos a consultar, déjalo vacío."
+        },
+        {
+          "key": "connect_timeout",
+          "label": "Timeout de conexión (segundos)",
+          "type": "number",
+          "required": false,
+          "default": "10"
+        }
+      ]
+    }
+  ],
+  "env_prefix": "RUVIC_MONGODB_",
+  "operations": ["db.list_collections", "db.read", "db.count", "db.stats"],
+  "test_connection": true,
+  "docs": {
+    "skill": "SKILL.md",
+    "permissions_note": "El usuario necesita el rol read sobre la base de datos a consultar. No se requieren permisos de escritura ni de administración."
+  }
+}

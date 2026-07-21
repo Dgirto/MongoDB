@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="doc_title">Conector MongoDB — Ruvic</title>
+  <link rel="stylesheet" href="assets/ruvic.css">
+</head>
+<body class="guide">
+  <main class="ruvic-container">
+
+    <nav class="ruvic-toc" aria-label="Índice">
+      <h2 data-i18n="toc_title">Contenido</h2>
+      <ol>
+        <li><a href="#que-es" data-i18n="toc.que_es">¿Qué es y para qué sirve?</a></li>
+        <li><a href="#prerrequisitos" data-i18n="toc.prerrequisitos">Prerrequisitos</a></li>
+        <li><a href="#configuracion-fabricante" data-i18n="toc.configuracion_fabricante">Configuración en el fabricante</a></li>
+        <li><a href="#permisos" data-i18n="toc.permisos">Permisos requeridos</a></li>
+        <li><a href="#configuracion-ruvic" data-i18n="toc.configuracion_ruvic">Configuración en Ruvic</a></li>
+        <li><a href="#verificacion" data-i18n="toc.verificacion">Verificación</a></li>
+        <li><a href="#solucion-problemas" data-i18n="toc.solucion_problemas">Solución de problemas</a></li>
+        <li><a href="#faq-seguridad" data-i18n="toc.faq_seguridad">Preguntas frecuentes y notas de seguridad</a></li>
+      </ol>
+    </nav>
+
+    <h1 data-i18n="guide_title">MongoDB</h1>
+    <p class="guide-updated">{{ULTIMA_ACTUALIZACION}}</p>
+
+    <!-- ============ 1. QUÉ ES ============ -->
+    <section>
+      <h2 id="que-es" data-i18n="section.que_es">¿Qué es y para qué sirve?</h2>
+      <p data-i18n="que_es.body">El conector MongoDB permite que el agente de Ruvic acceda a tu base de datos <strong>en modo solo lectura</strong>: puede consultar colecciones y documentos, pero nunca modificarlos. Una vez configurado, puedes pedirle al agente cosas como:</p>
+      <ul>
+        <li data-i18n="que_es.ej1">“Cuéntame cuántos clientes hay registrados en Bogotá.”</li>
+        <li data-i18n="que_es.ej2">“Muéstrame los últimos 10 pedidos de la colección ventas.”</li>
+        <li data-i18n="que_es.ej3">“¿Qué colecciones tiene esta base de datos y cuántos documentos hay en cada una?”</li>
+      </ul>
+      <p data-i18n="que_es.ops">Operaciones soportadas:</p>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="table.operacion">Operación</th>
+            <th data-i18n="table.que_hace">Qué hace</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>db.list_collections</code></td>
+            <td data-i18n="ops.list_collections">Lista las colecciones de la base de datos con su cantidad estimada de documentos</td>
+          </tr>
+          <tr>
+            <td><code>db.read</code></td>
+            <td data-i18n="ops.read">Lee documentos de una colección con un filtro (con límite)</td>
+          </tr>
+          <tr>
+            <td><code>db.count</code></td>
+            <td data-i18n="ops.count">Cuenta documentos que cumplen un filtro</td>
+          </tr>
+          <tr>
+            <td><code>db.stats</code></td>
+            <td data-i18n="ops.stats">Estadísticas de una colección: documentos, tamaño e índices</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout callout-info">
+        <span class="callout-title" data-i18n="que_es.callout.title">Solo lectura, por diseño</span>
+        <span data-i18n="que_es.callout.body">El conector nunca invoca operaciones de escritura (insert, update, delete): solo emite comandos de lectura. Además, el usuario dedicado solo tiene el rol read. Hay dos barreras independientes.</span>
+      </div>
+    </section>
+
+    <!-- ============ 2. PRERREQUISITOS ============ -->
+    <section>
+      <h2 id="prerrequisitos" data-i18n="section.prerrequisitos">Prerrequisitos</h2>
+      <ul>
+        <li data-i18n="prer.db">Una base de datos <strong>MongoDB 5.0 o superior</strong> (en tu servidor, en la nube — MongoDB Atlas, DocumentDB — o en Docker).</li>
+        <li data-i18n="prer.admin">Acceso administrativo a la base de datos (rol con permiso para crear usuarios, ej. <code>userAdmin</code>), solo durante la configuración inicial.</li>
+        <li data-i18n="prer.red"><strong>Acceso de red</strong> desde la plataforma Ruvic al servidor de base de datos (host y puerto alcanzables; regla de firewall o lista de IPs permitidas si aplica).</li>
+        <li data-i18n="prer.datos">Los datos de conexión: host, puerto (por defecto <code>27017</code>) y nombre de la base de datos.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 3. CONFIGURACIÓN EN EL FABRICANTE ============ -->
+    <section>
+      <h2 id="configuracion-fabricante" data-i18n="section.configuracion_fabricante">Configuración en el fabricante</h2>
+      <p data-i18n="fab.intro">Vas a crear un <strong>usuario dedicado de solo lectura</strong> para Ruvic. No uses el usuario administrador (<code>root</code>) ni el de tu aplicación: un usuario dedicado permite auditar la actividad del agente y limitar el acceso al mínimo.</p>
+      <ol class="ruvic-steps">
+        <li>
+          <strong data-i18n="fab.p1.t">Conéctate a la base de datos como administrador.</strong>
+          <p data-i18n="fab.p1.b">Usa <code>mongosh</code> u otra herramienta (MongoDB Compass) con un usuario administrador:</p>
+<pre><code>mongosh "mongodb://TU_HOST:27017" -u admin -p --authenticationDatabase admin</code></pre>
+        </li>
+        <li>
+          <strong data-i18n="fab.p2.t">Crea el usuario de solo lectura para Ruvic.</strong>
+          <p data-i18n="fab.p2.b">Elige una contraseña fuerte (mínimo 16 caracteres, generada aleatoriamente) y guárdala: la usarás en el formulario de Ruvic (campo Contraseña). El usuario se crea con el rol <code>read</code> sobre la base de datos que quieras exponer:</p>
+<pre><code>use tu_base_de_datos
+db.createUser({
+  user: "ruvic_reader",
+  pwd: "CAMBIA_ESTA_CONTRASEÑA",
+  roles: [{ role: "read", db: "tu_base_de_datos" }]
+})</code></pre>
+          <div class="callout callout-info">
+            <span class="callout-title" data-i18n="fab.p2.note.title">Nota</span>
+            <span data-i18n="fab.p2.note.body">El rol read aplica automáticamente a todas las colecciones de la base de datos, incluidas las que se creen después. No hace falta repetir ningún GRANT.</span>
+          </div>
+        </li>
+        <li>
+          <strong data-i18n="fab.p3.t">Habilita el acceso de red desde Ruvic.</strong>
+          <p data-i18n="fab.p3.b">Si tu MongoDB restringe conexiones por IP (habitual en producción), permite la IP de la plataforma Ruvic:</p>
+          <ul>
+            <li data-i18n="fab.p3.li1"><strong>Servidor propio</strong>: regla de firewall del sistema operativo para el puerto <code>27017</code>, y verifica que <code>bindIp</code> en <code>mongod.conf</code> permita conexiones remotas.</li>
+            <li data-i18n="fab.p3.li2"><strong>MongoDB Atlas</strong>: agrega la IP en “Network Access → IP Access List”.</li>
+          </ul>
+          <div class="screenshot-placeholder" data-i18n="fab.p3.img">[ Captura: regla de firewall / IP Access List con la IP de Ruvic — reemplazar por assets/img/mongodb-firewall.png ]</div>
+        </li>
+        <li>
+          <strong data-i18n="fab.p4.t">Verifica el usuario desde fuera del servidor.</strong>
+          <p data-i18n="fab.p4.b">Desde una máquina distinta al servidor de BD (idealmente con salida de red similar a la de Ruvic):</p>
+<pre><code>mongosh "mongodb://TU_HOST:27017/tu_base_de_datos" -u ruvic_reader -p --authenticationDatabase tu_base_de_datos --eval "db.runCommand({ ping: 1 })"</code></pre>
+          <p data-i18n="fab.p4.result">Si responde <code>{ ok: 1 }</code>, el fabricante quedó listo. Anota estos valores para la siguiente sección: host, puerto, base de datos, usuario y contraseña.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ============ 4. PERMISOS ============ -->
+    <section>
+      <h2 id="permisos" data-i18n="section.permisos">Permisos requeridos</h2>
+      <p data-i18n="perm.intro">Principio de mínimo privilegio: el usuario de Ruvic solo necesita el rol <code>read</code>. No otorgues <code>readWrite</code>, <code>dbAdmin</code>, <code>userAdmin</code> ni roles de clúster.</p>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="table.permiso">Permiso</th>
+            <th data-i18n="table.para_que">Para qué sirve</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>read</code> <span data-i18n="perm.read.scope">(sobre la base de datos a consultar)</span></td>
+            <td data-i18n="perm.read.body">Listar colecciones (<code>db.list_collections</code>), leer y contar documentos (<code>db.read</code>, <code>db.count</code>) y obtener estadísticas (<code>db.stats</code>)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p data-i18n="perm.catalog">Los comandos de metadata que usa el conector (<code>listCollections</code>, <code>collStats</code>, índices) están disponibles para cualquier usuario con rol <code>read</code> sobre la base de datos; no requieren permisos adicionales.</p>
+    </section>
+
+    <!-- ============ 5. CONFIGURACIÓN EN RUVIC ============ -->
+    <section>
+      <h2 id="configuracion-ruvic" data-i18n="section.configuracion_ruvic">Configuración en Ruvic</h2>
+      <p data-i18n="ruvic.intro">Entra a <strong>Settings → Conectores</strong>, busca la tarjeta <strong>MongoDB</strong> y pulsa <strong>Configurar</strong>. Diligencia el formulario con los valores que obtuviste en la sección anterior:</p>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="table.campo">Campo del formulario</th>
+            <th data-i18n="table.valor">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-i18n="ruvic.f.host">Host</td>
+            <td data-i18n="ruvic.v.host">Hostname o IP del servidor (ej. <code>db.empresa.com</code>)</td>
+          </tr>
+          <tr>
+            <td data-i18n="ruvic.f.puerto">Puerto</td>
+            <td><code>27017</code> <span data-i18n="ruvic.v.puerto">(salvo configuración distinta)</span></td>
+          </tr>
+          <tr>
+            <td data-i18n="ruvic.f.bd">Base de datos</td>
+            <td data-i18n="ruvic.v.bd">Nombre de la base de datos a consultar</td>
+          </tr>
+          <tr>
+            <td data-i18n="ruvic.f.usuario">Usuario</td>
+            <td><code>ruvic_reader</code></td>
+          </tr>
+          <tr>
+            <td data-i18n="ruvic.f.pass">Contraseña</td>
+            <td data-i18n="ruvic.v.pass">La contraseña del paso 2. Se guarda cifrada como secreto: la interfaz no volverá a mostrarla</td>
+          </tr>
+          <tr>
+            <td data-i18n="ruvic.f.authsource">Base de datos de autenticación</td>
+            <td data-i18n="ruvic.v.authsource">Opcional. Solo necesaria si el usuario se creó en una base de datos distinta a la que se va a consultar (común en MongoDB Atlas, donde suele ser <code>admin</code>)</td>
+          </tr>
+          <tr>
+            <td data-i18n="ruvic.f.timeout">Timeout de conexión</td>
+            <td data-i18n="ruvic.v.timeout">Opcional; <code>10</code> segundos por defecto</td>
+          </tr>
+        </tbody>
+      </table>
+      <p data-i18n="ruvic.save">Guarda y pulsa <span class="ruvic-button">Probar conexión</span> — la plataforma se conectará a tu base de datos y confirmará que las credenciales y la red funcionan.</p>
+      <div class="screenshot-placeholder" data-i18n="ruvic.img">[ Captura: formulario del conector MongoDB en Settings → Conectores — reemplazar por assets/img/mongodb-form.png ]</div>
+    </section>
+
+    <!-- ============ 6. VERIFICACIÓN ============ -->
+    <section>
+      <h2 id="verificacion" data-i18n="section.verificacion">Verificación</h2>
+      <ol class="ruvic-steps">
+        <li>
+          <strong data-i18n="ver.p1.t">Test de conexión exitoso.</strong>
+          <p data-i18n="ver.p1.b">El botón <em>Probar conexión</em> debe responder: <em>“Conexión exitosa a tu-host:27017/tu_base”</em>. La tarjeta del conector cambia a estado <strong>Configurado</strong>.</p>
+        </li>
+        <li>
+          <strong data-i18n="ver.p2.t">Automatización mínima de prueba.</strong>
+          <p data-i18n="ver.p2.b">Abre una conversación nueva con el agente y pídele: <em>“Lista las colecciones de la base de datos MongoDB y dime cuántos documentos tiene cada una.”</em> El agente debe responder con el listado real de tus colecciones. Si lo hace, el conector quedó operativo de punta a punta.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ============ 7. SOLUCIÓN DE PROBLEMAS ============ -->
+    <section>
+      <h2 id="solucion-problemas" data-i18n="section.solucion_problemas">Solución de problemas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="table.sintoma">Mensaje / síntoma</th>
+            <th data-i18n="table.causa">Causa probable y solución</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-i18n="prob.s1">“Autenticación fallida” o “el usuario no tiene permiso de lectura”</td>
+            <td data-i18n="prob.c1">Contraseña mal copiada, usuario inexistente, o falta indicar la base de datos de autenticación correcta (campo authSource). Reintenta el paso 2 de la sección 3 y revisa el campo "Base de datos de autenticación" en el formulario.</td>
+          </tr>
+          <tr>
+            <td data-i18n="prob.s2">“No se pudo conectar … (timeout)”</td>
+            <td data-i18n="prob.c2">La plataforma no alcanza el host/puerto. Revisa el paso 3 (firewall / IP Access List / <code>bindIp</code>) y que el host no sea <code>localhost</code> (debe ser accesible desde Ruvic, no desde tu equipo).</td>
+          </tr>
+          <tr>
+            <td data-i18n="prob.s3">“La colección 'X' no existe”</td>
+            <td data-i18n="prob.c3">Nombre de colección mal escrito. Verifica con <code>show collections</code> en mongosh, conectado a la base de datos correcta.</td>
+          </tr>
+          <tr>
+            <td data-i18n="prob.s4">El agente lista colecciones pero falla al leer una en particular</td>
+            <td data-i18n="prob.c4">El usuario fue creado con el rol read sobre una base de datos distinta a la que contiene esa colección. Repite el paso 2 de la sección 3 apuntando a la base de datos correcta.</td>
+          </tr>
+          <tr>
+            <td data-i18n="prob.s5">El conector aparece “Sin configurar” tras guardar</td>
+            <td data-i18n="prob.c5">Algún campo obligatorio quedó vacío. Ábrelo de nuevo y completa host, puerto, base de datos, usuario y contraseña.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============ 8. FAQ Y SEGURIDAD ============ -->
+    <section>
+      <h2 id="faq-seguridad" data-i18n="section.faq_seguridad">Preguntas frecuentes y notas de seguridad</h2>
+
+      <h3 data-i18n="faq.q1">¿El agente puede modificar o borrar documentos?</h3>
+      <p data-i18n="faq.a1">No. El conector nunca invoca operaciones de escritura (insert, update, delete) y el usuario <code>ruvic_reader</code> solo tiene el rol <code>read</code>. Hay dos barreras independientes.</p>
+
+      <h3 data-i18n="faq.q2">¿Dónde queda guardada la contraseña?</h3>
+      <p data-i18n="faq.a2">Como secreto en el almacén de credenciales de la plataforma, asociado a tu usuario. La interfaz nunca vuelve a mostrarla; solo indica “definida”. Para cambiarla, escribe una nueva en el formulario; para conservarla al editar otros campos, deja el campo vacío.</p>
+
+      <h3 data-i18n="faq.q3">Rotación de credenciales</h3>
+      <p data-i18n="faq.a3">Recomendado cada 90 días o según tu política: cambia la contraseña en MongoDB (<code>db.changeUserPassword("ruvic_reader", "...")</code>), actualízala en el formulario del conector y pulsa <em>Probar conexión</em>.</p>
+
+      <h3 data-i18n="faq.q4">¿Qué hago si la contraseña se compromete?</h3>
+      <ol>
+        <li data-i18n="faq.a4.li1">Cambia la contraseña en MongoDB de inmediato (<code>db.changeUserPassword(...)</code>) o elimina el usuario (<code>db.dropUser("ruvic_reader")</code>).</li>
+        <li data-i18n="faq.a4.li2">Revisa la actividad reciente en los logs del servidor o en el Audit Log de Atlas.</li>
+        <li data-i18n="faq.a4.li3">Actualiza la nueva contraseña en el formulario del conector.</li>
+      </ol>
+
+      <h3 data-i18n="faq.q5">¿Expiran las credenciales?</h3>
+      <p data-i18n="faq.a5">Por defecto no (usuario/contraseña de MongoDB no caducan solos). Si tu política exige expiración, gestiónala manualmente rotando la contraseña o el usuario según tu calendario de seguridad.</p>
+
+      <div class="callout callout-warning">
+        <span class="callout-title" data-i18n="faq.bp.title">Buenas prácticas</span>
+        <span data-i18n="faq.bp.body">Usa siempre un usuario dedicado y de solo lectura; restringe el acceso por IP; no expongas colecciones con datos sensibles que el agente no necesite; y evita compartir la contraseña por canales no seguros.</span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const I18N = {
+      es: {
+        doc_title: "Conector MongoDB — Ruvic",
+        toc_title: "Contenido",
+        "toc.que_es": "¿Qué es y para qué sirve?",
+        "toc.prerrequisitos": "Prerrequisitos",
+        "toc.configuracion_fabricante": "Configuración en el fabricante",
+        "toc.permisos": "Permisos requeridos",
+        "toc.configuracion_ruvic": "Configuración en Ruvic",
+        "toc.verificacion": "Verificación",
+        "toc.solucion_problemas": "Solución de problemas",
+        "toc.faq_seguridad": "Preguntas frecuentes y notas de seguridad",
+        guide_title: "MongoDB",
+        "section.que_es": "¿Qué es y para qué sirve?",
+        "que_es.body": "El conector MongoDB permite que el agente de Ruvic acceda a tu base de datos en modo solo lectura: puede consultar colecciones y documentos, pero nunca modificarlos. Una vez configurado, puedes pedirle al agente cosas como:",
+        "que_es.ej1": "“Cuéntame cuántos clientes hay registrados en Bogotá.”",
+        "que_es.ej2": "“Muéstrame los últimos 10 pedidos de la colección ventas.”",
+        "que_es.ej3": "“¿Qué colecciones tiene esta base de datos y cuántos documentos hay en cada una?”",
+        "que_es.ops": "Operaciones soportadas:",
+        "table.operacion": "Operación",
+        "table.que_hace": "Qué hace",
+        "ops.list_collections": "Lista las colecciones de la base de datos con su cantidad estimada de documentos",
+        "ops.read": "Lee documentos de una colección con un filtro (con límite)",
+        "ops.count": "Cuenta documentos que cumplen un filtro",
+        "ops.stats": "Estadísticas de una colección: documentos, tamaño e índices",
+        "que_es.callout.title": "Solo lectura, por diseño",
+        "que_es.callout.body": "El conector nunca invoca operaciones de escritura (insert, update, delete): solo emite comandos de lectura. Además, el usuario dedicado solo tiene el rol read. Hay dos barreras independientes.",
+        "section.prerrequisitos": "Prerrequisitos",
+        "prer.db": "Una base de datos MongoDB 5.0 o superior (en tu servidor, en la nube — MongoDB Atlas, DocumentDB — o en Docker).",
+        "prer.admin": "Acceso administrativo a la base de datos (rol con permiso para crear usuarios, ej. userAdmin), solo durante la configuración inicial.",
+        "prer.red": "Acceso de red desde la plataforma Ruvic al servidor de base de datos (host y puerto alcanzables; regla de firewall o lista de IPs permitidas si aplica).",
+        "prer.datos": "Los datos de conexión: host, puerto (por defecto 27017) y nombre de la base de datos.",
+        "section.configuracion_fabricante": "Configuración en el fabricante",
+        "fab.intro": "Vas a crear un usuario dedicado de solo lectura para Ruvic. No uses el usuario administrador (root) ni el de tu aplicación: un usuario dedicado permite auditar la actividad del agente y limitar el acceso al mínimo.",
+        "fab.p1.t": "Conéctate a la base de datos como administrador.",
+        "fab.p1.b": "Usa mongosh u otra herramienta (MongoDB Compass) con un usuario administrador:",
+        "fab.p2.t": "Crea el usuario de solo lectura para Ruvic.",
+        "fab.p2.b": "Elige una contraseña fuerte (mínimo 16 caracteres, generada aleatoriamente) y guárdala: la usarás en el formulario de Ruvic (campo Contraseña). El usuario se crea con el rol read sobre la base de datos que quieras exponer:",
+        "fab.p2.note.title": "Nota",
+        "fab.p2.note.body": "El rol read aplica automáticamente a todas las colecciones de la base de datos, incluidas las que se creen después. No hace falta repetir ningún GRANT.",
+        "fab.p3.t": "Habilita el acceso de red desde Ruvic.",
+        "fab.p3.b": "Si tu MongoDB restringe conexiones por IP (habitual en producción), permite la IP de la plataforma Ruvic:",
+        "fab.p3.li1": "Servidor propio: regla de firewall del sistema operativo para el puerto 27017, y verifica que bindIp en mongod.conf permita conexiones remotas.",
+        "fab.p3.li2": "MongoDB Atlas: agrega la IP en “Network Access → IP Access List”.",
+        "fab.p3.img": "[ Captura: regla de firewall / IP Access List con la IP de Ruvic — reemplazar por assets/img/mongodb-firewall.png ]",
+        "fab.p4.t": "Verifica el usuario desde fuera del servidor.",
+        "fab.p4.b": "Desde una máquina distinta al servidor de BD (idealmente con salida de red similar a la de Ruvic):",
+        "fab.p4.result": "Si responde { ok: 1 }, el fabricante quedó listo. Anota estos valores para la siguiente sección: host, puerto, base de datos, usuario y contraseña.",
+        "section.permisos": "Permisos requeridos",
+        "perm.intro": "Principio de mínimo privilegio: el usuario de Ruvic solo necesita el rol read. No otorgues readWrite, dbAdmin, userAdmin ni roles de clúster.",
+        "table.permiso": "Permiso",
+        "table.para_que": "Para qué sirve",
+        "perm.read.scope": "(sobre la base de datos a consultar)",
+        "perm.read.body": "Listar colecciones (db.list_collections), leer y contar documentos (db.read, db.count) y obtener estadísticas (db.stats)",
+        "perm.catalog": "Los comandos de metadata que usa el conector (listCollections, collStats, índices) están disponibles para cualquier usuario con rol read sobre la base de datos; no requieren permisos adicionales.",
+        "section.configuracion_ruvic": "Configuración en Ruvic",
+        "ruvic.intro": "Entra a Settings → Conectores, busca la tarjeta MongoDB y pulsa Configurar. Diligencia el formulario con los valores que obtuviste en la sección anterior:",
+        "table.campo": "Campo del formulario",
+        "table.valor": "Valor",
+        "ruvic.f.host": "Host",
+        "ruvic.v.host": "Hostname o IP del servidor (ej. db.empresa.com)",
+        "ruvic.f.puerto": "Puerto",
+        "ruvic.v.puerto": "(salvo configuración distinta)",
+        "ruvic.f.bd": "Base de datos",
+        "ruvic.v.bd": "Nombre de la base de datos a consultar",
+        "ruvic.f.usuario": "Usuario",
+        "ruvic.f.pass": "Contraseña",
+        "ruvic.v.pass": "La contraseña del paso 2. Se guarda cifrada como secreto: la interfaz no volverá a mostrarla",
+        "ruvic.f.authsource": "Base de datos de autenticación",
+        "ruvic.v.authsource": "Opcional. Solo necesaria si el usuario se creó en una base de datos distinta a la que se va a consultar (común en MongoDB Atlas, donde suele ser admin)",
+        "ruvic.f.timeout": "Timeout de conexión",
+        "ruvic.v.timeout": "Opcional; 10 segundos por defecto",
+        "ruvic.save": "Guarda y pulsa Probar conexión — la plataforma se conectará a tu base de datos y confirmará que las credenciales y la red funcionan.",
+        "ruvic.img": "[ Captura: formulario del conector MongoDB en Settings → Conectores — reemplazar por assets/img/mongodb-form.png ]",
+        "section.verificacion": "Verificación",
+        "ver.p1.t": "Test de conexión exitoso.",
+        "ver.p1.b": "El botón Probar conexión debe responder: “Conexión exitosa a tu-host:27017/tu_base”. La tarjeta del conector cambia a estado Configurado.",
+        "ver.p2.t": "Automatización mínima de prueba.",
+        "ver.p2.b": "Abre una conversación nueva con el agente y pídele: “Lista las colecciones de la base de datos MongoDB y dime cuántos documentos tiene cada una.” El agente debe responder con el listado real de tus colecciones. Si lo hace, el conector quedó operativo de punta a punta.",
+        "section.solucion_problemas": "Solución de problemas",
+        "table.sintoma": "Mensaje / síntoma",
+        "table.causa": "Causa probable y solución",
+        "prob.s1": "“Autenticación fallida” o “el usuario no tiene permiso de lectura”",
+        "prob.c1": "Contraseña mal copiada, usuario inexistente, o falta indicar la base de datos de autenticación correcta (campo authSource). Reintenta el paso 2 de la sección 3 y revisa el campo \"Base de datos de autenticación\" en el formulario.",
+        "prob.s2": "“No se pudo conectar … (timeout)”",
+        "prob.c2": "La plataforma no alcanza el host/puerto. Revisa el paso 3 (firewall / IP Access List / bindIp) y que el host no sea localhost (debe ser accesible desde Ruvic, no desde tu equipo).",
+        "prob.s3": "“La colección 'X' no existe”",
+        "prob.c3": "Nombre de colección mal escrito. Verifica con show collections en mongosh, conectado a la base de datos correcta.",
+        "prob.s4": "El agente lista colecciones pero falla al leer una en particular",
+        "prob.c4": "El usuario fue creado con el rol read sobre una base de datos distinta a la que contiene esa colección. Repite el paso 2 de la sección 3 apuntando a la base de datos correcta.",
+        "prob.s5": "El conector aparece “Sin configurar” tras guardar",
+        "prob.c5": "Algún campo obligatorio quedó vacío. Ábrelo de nuevo y completa host, puerto, base de datos, usuario y contraseña.",
+        "section.faq_seguridad": "Preguntas frecuentes y notas de seguridad",
+        "faq.q1": "¿El agente puede modificar o borrar documentos?",
+        "faq.a1": "No. El conector nunca invoca operaciones de escritura (insert, update, delete) y el usuario ruvic_reader solo tiene el rol read. Hay dos barreras independientes.",
+        "faq.q2": "¿Dónde queda guardada la contraseña?",
+        "faq.a2": "Como secreto en el almacén de credenciales de la plataforma, asociado a tu usuario. La interfaz nunca vuelve a mostrarla; solo indica “definida”. Para cambiarla, escribe una nueva en el formulario; para conservarla al editar otros campos, deja el campo vacío.",
+        "faq.q3": "Rotación de credenciales",
+        "faq.a3": "Recomendado cada 90 días o según tu política: cambia la contraseña en MongoDB (db.changeUserPassword(\"ruvic_reader\", \"...\")), actualízala en el formulario del conector y pulsa Probar conexión.",
+        "faq.q4": "¿Qué hago si la contraseña se compromete?",
+        "faq.a4.li1": "Cambia la contraseña en MongoDB de inmediato (db.changeUserPassword(...)) o elimina el usuario (db.dropUser(\"ruvic_reader\")).",
+        "faq.a4.li2": "Revisa la actividad reciente en los logs del servidor o en el Audit Log de Atlas.",
+        "faq.a4.li3": "Actualiza la nueva contraseña en el formulario del conector.",
+        "faq.q5": "¿Expiran las credenciales?",
+        "faq.a5": "Por defecto no (usuario/contraseña de MongoDB no caducan solos). Si tu política exige expiración, gestiónala manualmente rotando la contraseña o el usuario según tu calendario de seguridad.",
+        "faq.bp.title": "Buenas prácticas",
+        "faq.bp.body": "Usa siempre un usuario dedicado y de solo lectura; restringe el acceso por IP; no expongas colecciones con datos sensibles que el agente no necesite; y evita compartir la contraseña por canales no seguros.",
+      },
+      en: {
+        doc_title: "MongoDB Connector — Ruvic",
+        toc_title: "Contents",
+        "toc.que_es": "What it is and what it’s for",
+        "toc.prerrequisitos": "Prerequisites",
+        "toc.configuracion_fabricante": "Vendor / provider setup",
+        "toc.permisos": "Required permissions",
+        "toc.configuracion_ruvic": "Configuration in Ruvic",
+        "toc.verificacion": "Verification",
+        "toc.solucion_problemas": "Troubleshooting",
+        "toc.faq_seguridad": "FAQ and security notes",
+        guide_title: "MongoDB",
+        "section.que_es": "What it is and what it’s for",
+        "que_es.body": "The MongoDB connector lets the Ruvic agent access your database in read-only mode: it can query collections and documents but never modify them. Once configured, you can ask the agent things like:",
+        "que_es.ej1": "“Tell me how many customers are registered in Bogota.”",
+        "que_es.ej2": "“Show me the last 10 orders in the sales collection.”",
+        "que_es.ej3": "“What collections does this database have and how many documents are in each?”",
+        "que_es.ops": "Supported operations:",
+        "table.operacion": "Operation",
+        "table.que_hace": "What it does",
+        "ops.list_collections": "Lists the database collections with their estimated document count",
+        "ops.read": "Reads documents from a collection with a filter (with a limit)",
+        "ops.count": "Counts documents matching a filter",
+        "ops.stats": "Statistics for a collection: documents, size and indexes",
+        "que_es.callout.title": "Read-only by design",
+        "que_es.callout.body": "The connector never issues write operations (insert, update, delete): it only issues read commands. On top of that, the dedicated user only has the read role. Two independent safeguards.",
+        "section.prerrequisitos": "Prerequisites",
+        "prer.db": "A MongoDB 5.0+ database (self-hosted, cloud — MongoDB Atlas, DocumentDB — or Docker).",
+        "prer.admin": "Administrative access to the database (a role that can create users, e.g. userAdmin), only during initial setup.",
+        "prer.red": "Network access from the Ruvic platform to the database server (reachable host and port; firewall rule or IP allow-list if applicable).",
+        "prer.datos": "The connection details: host, port (default 27017) and database name.",
+        "section.configuracion_fabricante": "Vendor / provider setup",
+        "fab.intro": "You will create a dedicated read-only user for Ruvic. Do not reuse the admin user (root) or an application user: a dedicated user lets you audit the agent's activity and keep access to a minimum.",
+        "fab.p1.t": "Connect to the database as an administrator.",
+        "fab.p1.b": "Use mongosh or another tool (MongoDB Compass) with an admin user:",
+        "fab.p2.t": "Create the read-only user for Ruvic.",
+        "fab.p2.b": "Choose a strong password (16+ random characters) and save it: you will paste it into the Ruvic form (Password field). The user is created with the read role on the database you want to expose:",
+        "fab.p2.note.title": "Note",
+        "fab.p2.note.body": "The read role automatically applies to every collection in the database, including ones created afterwards. No need to re-run any grant.",
+        "fab.p3.t": "Enable network access from Ruvic.",
+        "fab.p3.b": "If your MongoDB restricts connections by IP (common in production), allow the Ruvic platform IP:",
+        "fab.p3.li1": "Self-hosted: OS firewall rule for port 27017, and make sure bindIp in mongod.conf allows remote connections.",
+        "fab.p3.li2": "MongoDB Atlas: add the IP under “Network Access → IP Access List”.",
+        "fab.p3.img": "[ Screenshot: firewall rule / IP Access List with the Ruvic IP — replace with assets/img/mongodb-firewall.png ]",
+        "fab.p4.t": "Verify the user from outside the server.",
+        "fab.p4.b": "From a machine other than the DB server (ideally with network egress similar to Ruvic's):",
+        "fab.p4.result": "If it returns { ok: 1 }, the vendor side is ready. Write down these values for the next section: host, port, database, user and password.",
+        "section.permisos": "Required permissions",
+        "perm.intro": "Least-privilege principle: the Ruvic user only needs the read role. Do not grant readWrite, dbAdmin, userAdmin or cluster roles.",
+        "table.permiso": "Permission",
+        "table.para_que": "Why it's needed",
+        "perm.read.scope": "(on the database to query)",
+        "perm.read.body": "List collections (db.list_collections), read and count documents (db.read, db.count) and get statistics (db.stats)",
+        "perm.catalog": "The metadata commands the connector uses (listCollections, collStats, indexes) are available to any user with the read role on the database; no extra permissions required.",
+        "section.configuracion_ruvic": "Configuration in Ruvic",
+        "ruvic.intro": "Go to Settings → Connectors, find the MongoDB card and click Configure. Fill in the form with the values from the previous section:",
+        "table.campo": "Form field",
+        "table.valor": "Value",
+        "ruvic.f.host": "Host",
+        "ruvic.v.host": "Server hostname or IP (e.g. db.company.com)",
+        "ruvic.f.puerto": "Port",
+        "ruvic.v.puerto": "(unless configured otherwise)",
+        "ruvic.f.bd": "Database",
+        "ruvic.v.bd": "Name of the database to query",
+        "ruvic.f.usuario": "Username",
+        "ruvic.f.pass": "Password",
+        "ruvic.v.pass": "The password from step 2. Stored as a secret: the UI will never display it again",
+        "ruvic.f.authsource": "Authentication database",
+        "ruvic.v.authsource": "Optional. Only needed if the user was created in a database different from the one being queried (common on MongoDB Atlas, usually admin)",
+        "ruvic.f.timeout": "Connection timeout",
+        "ruvic.v.timeout": "Optional; defaults to 10 seconds",
+        "ruvic.save": "Save and click Test connection — the platform will connect to your database and confirm credentials and networking work.",
+        "ruvic.img": "[ Screenshot: MongoDB connector form in Settings → Connectors — replace with assets/img/mongodb-form.png ]",
+        "section.verificacion": "Verification",
+        "ver.p1.t": "Successful connection test.",
+        "ver.p1.b": "The Test connection button should return: “Successful connection to your-host:27017/your_db”. The connector card switches to Configured.",
+        "ver.p2.t": "Minimal test automation.",
+        "ver.p2.b": "Open a new conversation with the agent and ask: “List the collections in the MongoDB database and tell me how many documents each one has.” The agent should reply with your actual collection list. If it does, the connector is fully operational.",
+        "section.solucion_problemas": "Troubleshooting",
+        "table.sintoma": "Message / symptom",
+        "table.causa": "Likely cause and fix",
+        "prob.s1": "“Authentication failed” or “user is not authorized for read access”",
+        "prob.c1": "Mistyped password, missing user, or the correct authentication database wasn't specified (authSource field). Redo step 2 of section 3 and check the \"Authentication database\" field in the form.",
+        "prob.s2": "“Could not connect … (timeout)”",
+        "prob.c2": "The platform cannot reach the host/port. Review step 3 (firewall / IP Access List / bindIp) and make sure the host is not localhost (it must be reachable from Ruvic, not from your laptop).",
+        "prob.s3": "“Collection 'X' does not exist”",
+        "prob.c3": "Collection name mistyped. Check with show collections in mongosh, connected to the correct database.",
+        "prob.s4": "The agent lists collections but fails reading a specific one",
+        "prob.c4": "The user was created with the read role on a database different from the one containing that collection. Redo step 2 of section 3 targeting the correct database.",
+        "prob.s5": "Connector shows “Not configured” after saving",
+        "prob.c5": "A required field was left empty. Open it again and fill in host, port, database, user and password.",
+        "section.faq_seguridad": "FAQ and security notes",
+        "faq.q1": "Can the agent modify or delete documents?",
+        "faq.a1": "No. The connector never issues write operations (insert, update, delete) and the ruvic_reader user only has the read role. Two independent safeguards.",
+        "faq.q2": "Where is the password stored?",
+        "faq.a2": "As a secret in the platform's credential store, tied to your user. The UI never displays it again; it only shows “set”. To change it, type a new one in the form; to keep it while editing other fields, leave the field empty.",
+        "faq.q3": "Credential rotation",
+        "faq.a3": "Recommended every 90 days or per your policy: change the password in MongoDB (db.changeUserPassword(\"ruvic_reader\", \"...\")), update it in the connector form and click Test connection.",
+        "faq.q4": "What if the password is compromised?",
+        "faq.a4.li1": "Change the password in MongoDB immediately (db.changeUserPassword(...)) or drop the user (db.dropUser(\"ruvic_reader\")).",
+        "faq.a4.li2": "Review recent activity in the server logs or the Atlas Audit Log.",
+        "faq.a4.li3": "Update the new password in the connector form.",
+        "faq.q5": "Do the credentials expire?",
+        "faq.a5": "By default no (MongoDB user/password does not expire on its own). If your policy requires expiration, manage it manually by rotating the password or user per your security schedule.",
+        "faq.bp.title": "Best practices",
+        "faq.bp.body": "Always use a dedicated read-only user; restrict access by IP; do not expose collections with sensitive data the agent doesn't need; and never share the password over insecure channels.",
+      },
+    };
+    /* El portal aplica el idioma del usuario (localStorage ruvic-docs-lang)
+       y actualiza [data-i18n], [data-i18n-placeholder] y [data-i18n-alt]. */
+  </script>
+</body>
+</html>
