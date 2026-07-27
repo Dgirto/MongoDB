@@ -34,16 +34,32 @@ db.createUser({
   (usuarios creados en `admin`, común en MongoDB Atlas), indícalo en el
   campo "Base de datos de autenticación" del formulario.
 
+## MongoDB Atlas y otros proveedores gestionados
+
+Atlas (y la mayoría de proveedores gestionados) no exponen el cluster en un
+host:puerto directo — requieren el esquema `mongodb+srv://`, que resuelve
+los nodos reales vía DNS SRV. Para conectarte a Atlas:
+
+- Activá **`RUVIC_MONGODB_USE_SRV=true`** (campo "Usar DNS SRV" en el
+  formulario). El campo `PORT` se ignora en ese modo.
+- `HOST` es el hostname del cluster tal como lo muestra Atlas en "Connect"
+  (ej. `cluster0.abcde.mongodb.net`), **sin** `mongodb+srv://` ni
+  credenciales en la URL.
+- `AUTH_SOURCE` normalmente debe ser **`admin`** en Atlas (los usuarios de
+  base de datos se autentican contra `admin`, no contra la base que vas a
+  consultar).
+
 ## Variables de entorno (`RUVIC_MONGODB_*`)
 
 | Variable | Obligatoria | Descripción |
 |----------|-------------|-------------|
-| `RUVIC_MONGODB_HOST` | Sí | Host del servidor |
-| `RUVIC_MONGODB_PORT` | No (default `27017`) | Puerto |
+| `RUVIC_MONGODB_HOST` | Sí | Host del servidor (o del cluster, si `USE_SRV=true`) |
+| `RUVIC_MONGODB_USE_SRV` | No (default `false`) | `true` para `mongodb+srv://` (Atlas y proveedores gestionados) |
+| `RUVIC_MONGODB_PORT` | No (default `27017`) | Puerto. Se ignora si `USE_SRV=true` |
 | `RUVIC_MONGODB_DATABASE` | Sí | Base de datos a consultar |
 | `RUVIC_MONGODB_USERNAME` | Sí | Usuario |
 | `RUVIC_MONGODB_PASSWORD` | Sí | Contraseña |
-| `RUVIC_MONGODB_AUTH_SOURCE` | No (default: la misma base de datos) | Base de datos de autenticación |
+| `RUVIC_MONGODB_AUTH_SOURCE` | No (default: la misma base de datos) | Base de datos de autenticación (usar `admin` en Atlas) |
 | `RUVIC_MONGODB_CONNECT_TIMEOUT` | No (default `10`) | Timeout de conexión en segundos |
 
 ## Pruebas locales

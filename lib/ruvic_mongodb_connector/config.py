@@ -12,10 +12,26 @@ from dataclasses import dataclass
 
 ENV_PREFIX = "RUVIC_MONGODB_"
 
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _as_bool(value: str | None, default: bool) -> bool:
+    if value is None or value == "":
+        return default
+    return value.strip().lower() in _TRUE_VALUES
+
 
 @dataclass(frozen=True)
 class MongodbConfig:
-    """Parámetros de conexión a MongoDB."""
+    """Parámetros de conexión a MongoDB.
+
+    use_srv=True (recomendado para MongoDB Atlas y la mayoría de
+    proveedores gestionados) usa el esquema mongodb+srv://, que
+    resuelve host y puertos reales del cluster vía DNS SRV — en ese
+    caso `port` se ignora, tal como exige el driver oficial.
+    use_srv=False es para instancias autoalojadas/standalone con
+    conexión directa host:port.
+    """
 
     host: str
     port: int
@@ -23,6 +39,7 @@ class MongodbConfig:
     username: str
     password: str
     auth_source: str
+    use_srv: bool = False
     connect_timeout: int = 10
 
     @classmethod
@@ -56,5 +73,6 @@ class MongodbConfig:
             username=os.environ[f"{ENV_PREFIX}USERNAME"],
             password=os.environ[f"{ENV_PREFIX}PASSWORD"],
             auth_source=os.environ.get(f"{ENV_PREFIX}AUTH_SOURCE", database),
+            use_srv=_as_bool(os.environ.get(f"{ENV_PREFIX}USE_SRV"), False),
             connect_timeout=int(os.environ.get(f"{ENV_PREFIX}CONNECT_TIMEOUT", "10")),
         )

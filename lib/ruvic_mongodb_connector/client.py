@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime
 import re
 from typing import Any
+from urllib.parse import quote_plus
 
 from bson import ObjectId
 from pymongo import MongoClient as _PyMongoClient
@@ -120,15 +121,31 @@ class MongodbClient:
     def _get_client(self) -> _PyMongoClient:
         if self._client is not None:
             return self._client
-        self._client = _PyMongoClient(
-            host=self.config.host,
-            port=self.config.port,
-            username=self.config.username,
-            password=self.config.password,
-            authSource=self.config.auth_source,
-            serverSelectionTimeoutMS=self.config.connect_timeout * 1000,
-            connectTimeoutMS=self.config.connect_timeout * 1000,
-        )
+        if self.config.use_srv:
+            # mongodb+srv:// (MongoDB Atlas y la mayoría de proveedores
+            # gestionados): el driver resuelve host y puertos reales del
+            # cluster vía DNS SRV, así que NO se pasa `port`.
+            uri = (
+                f"mongodb+srv://{quote_plus(self.config.username)}:"
+                f"{quote_plus(self.config.password)}@{self.config.host}/"
+                f"?authSource={quote_plus(self.config.auth_source)}"
+            )
+            self._client = _PyMongoClient(
+                uri,
+                serverSelectionTimeoutMS=self.config.connect_timeout * 1000,
+                connectTimeoutMS=self.config.connect_timeout * 1000,
+            )
+        else:
+            # Instancia autoalojada/standalone: conexión directa host:port.
+            self._client = _PyMongoClient(
+                host=self.config.host,
+                port=self.config.port,
+                username=self.config.username,
+                password=self.config.password,
+                authSource=self.config.auth_source,
+                serverSelectionTimeoutMS=self.config.connect_timeout * 1000,
+                connectTimeoutMS=self.config.connect_timeout * 1000,
+            )
         return self._client
 
     def _get_database(self):

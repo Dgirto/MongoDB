@@ -25,14 +25,23 @@
           "type": "text",
           "required": true,
           "placeholder": "db.empresa.com",
-          "help_text": "Hostname o IP del servidor MongoDB"
+          "help_text": "Hostname o IP del servidor MongoDB. Para MongoDB Atlas u otro proveedor gestionado, usa el hostname del cluster (ej. 'cluster0.abcde.mongodb.net', sin 'mongodb+srv://' ni credenciales) y activa 'Usar DNS SRV' abajo."
+        },
+        {
+          "key": "use_srv",
+          "label": "Usar DNS SRV (mongodb+srv://)",
+          "type": "boolean",
+          "required": false,
+          "default": "false",
+          "help_text": "Actívalo para MongoDB Atlas y la mayoría de proveedores gestionados: el driver resuelve los nodos reales del cluster vía DNS SRV y el campo Puerto se ignora. Déjalo desactivado solo para una instancia autoalojada/standalone con conexión directa host:puerto."
         },
         {
           "key": "port",
           "label": "Puerto",
           "type": "number",
           "required": true,
-          "default": "27017"
+          "default": "27017",
+          "help_text": "Se ignora si 'Usar DNS SRV' está activado."
         },
         {
           "key": "database",
@@ -60,7 +69,7 @@
           "label": "Base de datos de autenticación",
           "type": "text",
           "required": false,
-          "help_text": "Base de datos donde se validan las credenciales (authSource). Si el usuario se creó en la misma base de datos a consultar, déjalo vacío."
+          "help_text": "Base de datos donde se validan las credenciales (authSource). En MongoDB Atlas y la mayoría de proveedores gestionados, los usuarios se autentican contra 'admin' (escribilo explícitamente). En una instancia autoalojada, si el usuario se creó en la misma base de datos a consultar, déjalo vacío."
         },
         {
           "key": "connect_timeout",

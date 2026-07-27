@@ -26,8 +26,9 @@ El código generado **NUNCA hardcodea credenciales**. Siempre se leen de variabl
 
 | Variable | Contenido |
 |----------|-----------|
-| `RUVIC_MONGODB_HOST` | Host del servidor |
-| `RUVIC_MONGODB_PORT` | Puerto (default 27017) |
+| `RUVIC_MONGODB_HOST` | Host del servidor (o del cluster, si se usa DNS SRV) |
+| `RUVIC_MONGODB_USE_SRV` | (opcional) `true` para `mongodb+srv://` — necesario en MongoDB Atlas y la mayoría de proveedores gestionados |
+| `RUVIC_MONGODB_PORT` | Puerto (default 27017). Se ignora si `USE_SRV=true` |
 | `RUVIC_MONGODB_DATABASE` | Nombre de la base de datos |
 | `RUVIC_MONGODB_USERNAME` | Usuario |
 | `RUVIC_MONGODB_PASSWORD` | Contraseña |
