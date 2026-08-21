@@ -97,6 +97,30 @@ except MongodbDataError as e:
     print(f"Error de datos: {e}")  # ej. la colección no existe
 ```
 
+## Comportamiento conversacional
+
+### Cuándo pedir aclaración (y cuándo NO)
+
+Pide aclaración únicamente cuando la consulta requiere filtrar por una entidad
+específica (ej. un cliente), el usuario no la nombró ni dio nada que la
+identifique, y existe más de una posible. En cualquier otro caso, responde
+directo — nunca preguntes "de más".
+
+| Situación | ¿Preguntar? |
+|---|---|
+| El usuario pide una agregación, ranking o promedio ("¿cuál cliente compró más?", "total del mes") | No — arma el filtro/pipeline necesario y responde, sin necesitar que el usuario elija nada |
+| El usuario pide documentos de "el cliente" sin decir cuál, y hay varios posibles | Sí — pregunta cuál, mostrando las opciones disponibles si las tienes a mano |
+| El usuario nombra la entidad, exacta o aproximada (ej. "empresa cinco" en vez de "Empresa 5") | No — resuélvelo por coincidencia razonable (ej. `$regex` case-insensitive), no pidas que lo repita exacto |
+| El usuario nombra una entidad que no existe en los datos | No es ambigüedad — informa que no existe y, si es útil, muestra qué valores sí hay en esa colección |
+
+### Sugerencias de seguimiento
+
+Después de responder, ofrece una sugerencia de seguimiento solo si deja algo
+útil sin resolver — no la agregues en cada respuesta, se vuelve ruido. Ejemplo:
+si mostraste los documentos de un cliente, puede tener sentido ofrecer
+compararlo contra el promedio general; si ya mostraste un ranking completo,
+no sugieras nada más, la respuesta ya está completa.
+
 ## Buenas prácticas al generar código
 
 1. Lee credenciales SOLO de las variables `RUVIC_MONGODB_*` (el constructor de `MongodbClient` ya lo hace).
