@@ -48,6 +48,12 @@ _NAMESPACE_NOT_FOUND_CODE = 26  # NamespaceNotFound
 # se bloquean sin importar en qué nivel de anidamiento aparezcan.
 _JS_EXECUTION_OPERATORS = {"$where", "$function", "$accumulator"}
 
+# Límite de profundidad para el recorrido recursivo del filtro. Un filtro
+# legítimo nunca se anida más de unos pocos niveles; sin este límite, un
+# filtro construido con miles de $or/$and anidados agota la pila de
+# Python (RecursionError sin manejar) antes de llegar a validar nada.
+_MAX_FILTER_DEPTH = 50
+
 
 def _validate_name(name: str, kind: str) -> None:
     """Valida nombres de colección/base de datos (sin '$' ni caracteres de control)."""
@@ -58,10 +64,17 @@ def _validate_name(name: str, kind: str) -> None:
         )
 
 
-def _validate_filter(value: Any) -> None:
+def _validate_filter(value: Any, depth: int = 0) -> None:
     """Recorre el filtro recursivamente y rechaza cualquier operador que
     ejecute JavaScript en el servidor ($where, $function, $accumulator),
-    sin importar en qué nivel de anidamiento aparezca."""
+    sin importar en qué nivel de anidamiento aparezca. Corta con un
+    rechazo limpio si el filtro está anidado más de _MAX_FILTER_DEPTH
+    niveles, en vez de dejar que la recursión agote la pila."""
+    if depth > _MAX_FILTER_DEPTH:
+        raise MongodbDataError(
+            f"El filtro está anidado más de {_MAX_FILTER_DEPTH} niveles; "
+            "revisa que no tenga una estructura corrupta o maliciosa."
+        )
     if isinstance(value, dict):
         for key, nested in value.items():
             if key in _JS_EXECUTION_OPERATORS:
@@ -69,10 +82,10 @@ def _validate_filter(value: Any) -> None:
                     f"El operador {key!r} ejecuta JavaScript en el servidor y "
                     "está prohibido en este conector de solo lectura."
                 )
-            _validate_filter(nested)
+            _validate_filter(nested, depth + 1)
     elif isinstance(value, list):
         for item in value:
-            _validate_filter(item)
+            _validate_filter(item, depth + 1)
 
 
 def _serialize(value: Any) -> Any:
