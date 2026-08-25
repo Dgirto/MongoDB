@@ -24,7 +24,6 @@ from bson import ObjectId
 from pymongo import MongoClient as _PyMongoClient
 from pymongo.errors import (
     ConnectionFailure,
-    InvalidName,
     OperationFailure,
     PyMongoError,
     ServerSelectionTimeoutError,
@@ -44,6 +43,11 @@ _NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _AUTH_CODE_NAMES = {"AuthenticationFailed", "Unauthorized"}
 _NAMESPACE_NOT_FOUND_CODE = 26  # NamespaceNotFound
 
+# Operadores que permiten ejecutar JavaScript arbitrario en el servidor
+# (server-side JS). Un filtro de solo lectura nunca debería necesitarlos;
+# se bloquean sin importar en qué nivel de anidamiento aparezcan.
+_JS_EXECUTION_OPERATORS = {"$where", "$function", "$accumulator"}
+
 
 def _validate_name(name: str, kind: str) -> None:
     """Valida nombres de colección/base de datos (sin '$' ni caracteres de control)."""
@@ -52,6 +56,23 @@ def _validate_name(name: str, kind: str) -> None:
             f"Nombre de {kind} inválido: {name!r}. "
             "Solo se permiten letras, números, guion, guion bajo y punto."
         )
+
+
+def _validate_filter(value: Any) -> None:
+    """Recorre el filtro recursivamente y rechaza cualquier operador que
+    ejecute JavaScript en el servidor ($where, $function, $accumulator),
+    sin importar en qué nivel de anidamiento aparezca."""
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if key in _JS_EXECUTION_OPERATORS:
+                raise MongodbDataError(
+                    f"El operador {key!r} ejecuta JavaScript en el servidor y "
+                    "está prohibido en este conector de solo lectura."
+                )
+            _validate_filter(nested)
+    elif isinstance(value, list):
+        for item in value:
+            _validate_filter(item)
 
 
 def _serialize(value: Any) -> Any:
@@ -238,7 +259,13 @@ class MongodbClient:
         _validate_name(collection, "colección")
         if filter is not None and not isinstance(filter, dict):
             raise MongodbDataError("filter debe ser un dict (o None).")
-        limit = max(1, min(int(limit), 10_000))
+        _validate_filter(filter)
+        try:
+            limit = max(1, min(int(limit), 10_000))
+        except (TypeError, ValueError) as exc:
+            raise MongodbDataError(
+                f"limit inválido: {limit!r}. Debe ser un número entero."
+            ) from exc
         db = self._get_database()
         try:
             cursor = db[collection].find(filter or {}).limit(limit)
@@ -279,6 +306,7 @@ class MongodbClient:
         _validate_name(collection, "colección")
         if filter is not None and not isinstance(filter, dict):
             raise MongodbDataError("filter debe ser un dict (o None).")
+        _validate_filter(filter)
         db = self._get_database()
         try:
             count = db[collection].count_documents(filter or {})

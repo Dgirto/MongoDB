@@ -43,7 +43,7 @@ class MongodbConfig:
     connect_timeout: int = 10
 
     @classmethod
-    def from_env(cls) -> "MongodbConfig":
+    def from_env(cls) -> MongodbConfig:
         """Construye la configuración desde las variables RUVIC_MONGODB_*.
 
         Raises:
