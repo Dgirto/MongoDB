@@ -57,6 +57,8 @@ _MAX_FILTER_DEPTH = 50
 
 def _validate_name(name: str, kind: str) -> None:
     """Valida nombres de colección/base de datos (sin '$' ni caracteres de control)."""
+    if not isinstance(name, str):
+        raise MongodbDataError(f"Nombre de {kind} debe ser un string, no {type(name).__name__}.")
     if not name or not _NAME_RE.match(name):
         raise MongodbDataError(
             f"Nombre de {kind} inválido: {name!r}. "
